@@ -1,0 +1,14 @@
+# SuperClaude: your instructions for Claude.
+# Lines starting with # are comments and are ignored. Everything else is sent
+# to Claude with every question, on top of SuperClaude's built-in rules (math in
+# LaTeX, black-on-white drawings for e-ink, how to put things on the page).
+#
+# Write here who you are, what you use the tablet for, and how you like answers:
+# language, tone, length. Some examples:
+#
+#   I'm a physics student. Answer in English, briefly, showing the key steps.
+#   Soy profesora de química. Contestá en español, corto y sin vueltas.
+#   Explain things as if to a curious 12-year-old.
+#
+# With nothing here, Claude answers in the language you write in.
+

@@ -1,0 +1,11 @@
+{
+  "name": "SuperClaude",
+  "desc": "Lasso anything and ask Claude: calculations, questions, charts, drawings.",
+  "iconPath": "assets/icon.png",
+  "versionName": "0.7.0",
+  "versionCode": "13",
+  "pluginID": "archilazoclaude1",
+  "pluginKey": "lazo_claude",
+  "jsMainPath": "index",
+  "uses-permissions": ["plugin.permission.FILE:READ", "plugin.permission.FILE:WRITE", "plugin.permission.INTERNET"]
+}

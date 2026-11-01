@@ -1,0 +1,28 @@
+{
+  "name": "superclaude",
+  "version": "0.7.0",
+  "private": true,
+  "description": "Lasso anything on a Supernote and ask Claude: calculations, questions, charts, drawings.",
+  "scripts": {
+    "build:plugin": "bash scripts/empaquetar.sh",
+    "probar": "node scripts/probar-claude.mjs"
+  },
+  "dependencies": {
+    "katex": "^0.16.47",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "sn-plugin-lib": "^0.2.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "18.0.0",
+    "@react-native-community/cli-platform-android": "18.0.0",
+    "@react-native/babel-preset": "0.79.2",
+    "@react-native/metro-config": "0.79.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

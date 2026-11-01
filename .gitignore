@@ -1,0 +1,4 @@
+node_modules/
+build/
+# la generan los scripts con la clave de Anthropic: nunca al repo
+src/clave.js

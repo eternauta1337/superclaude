@@ -1,0 +1,5 @@
+# SuperClaude: your Anthropic API key goes on the line below this comment.
+# Get one at console.anthropic.com → API Keys. Create one just for the tablet
+# and give it a spending limit: whoever has this file can use it.
+# Lines starting with # are ignored.
+
