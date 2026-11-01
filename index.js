@@ -3,6 +3,7 @@ import {PluginManager} from 'sn-plugin-lib';
 import App from './App';
 import {name as appName} from './app.json';
 import {empezar, reabrir} from './src/conversacion';
+import {mostrar} from './src/vista';
 
 const BOTON_LAZO = 7101;
 const BOTON_TEXTO = 7102;
@@ -43,6 +44,7 @@ PluginManager.registerButton(1, ['NOTE', 'DOC'], {
 
 PluginManager.registerButtonListener({
   onButtonPress(event) {
+    mostrar('chat');
     if (event?.id === BOTON_LAZO) {
       empezar('lazo');
     } else if (event?.id === BOTON_TEXTO) {
@@ -50,5 +52,15 @@ PluginManager.registerButtonListener({
     } else if (event?.id === BOTON_BARRA) {
       reabrir();
     }
+  },
+});
+
+// El botón de configuración que la tablet muestra en Ajustes → Apps → Plugins:
+// abre la pantalla de Ajustes del plugin (clave, modelo, idioma, prompt).
+PluginManager.registerConfigButton();
+PluginManager.registerConfigButtonListener({
+  onClick() {
+    mostrar('ajustes');
+    PluginManager.showPluginView();
   },
 });

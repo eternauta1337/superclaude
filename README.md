@@ -29,26 +29,30 @@ any other server.
 1. Copy `superclaude.snplg` into the `MyStyle` folder on the tablet (USB, Browse & Access, or
    Supernote Cloud).
 2. On the tablet: Settings → Apps → Plugins → Add plugin → SuperClaude.
-3. Lasso something and tap **SuperClaude**. The first time it asks for permission to read files
-   and use the internet ("Always allow"), and it creates three files in `MyStyle`:
+3. Open the plugin's settings: the config button next to SuperClaude in Settings → Apps → Plugins,
+   or ⚙ in the SuperClaude window. There you set:
 
-| File | What goes in it |
+| Setting | |
 | --- | --- |
-| `superclaude-api-key.txt` | Your Anthropic API key, on its own line. |
-| `superclaude-prompt.txt` | Your own instructions: who you are, what you use it for, the language, tone and length you want. |
-| `superclaude-config.txt` | `model = …` (default `claude-opus-5-5`), `effort = …` (`low`, `medium`, `high`), `language = …` for the interface (`en` or `es`). |
+| Anthropic API key | Typed once; only its last characters are shown afterwards. |
+| Model | **Fast** (Claude Haiku 5.5), **Balanced** (Claude Sonnet 5.5) or **Best** (Claude Opus 5.5). Also switchable from the chat window. |
+| Interface language | English or Español. |
+| Your instructions for Claude | Who you are, what you use it for, the language, tone and length you want. Sent with every question. |
 
-4. Put your key in `superclaude-api-key.txt` (edit it on a computer and sync, or copy it over USB).
-   Lines starting with `#` are comments.
+   **Import from MyStyle** fills the key and the instructions from `superclaude-api-key.txt` and
+   `superclaude-prompt.txt` in `MyStyle`, if you put them there (lines starting with `#` are
+   ignored). Reading those files depends on the firmware and may not work.
+4. Lasso something and tap **SuperClaude**. The first time it asks for permission to read files
+   and use the internet ("Always allow").
 
-Changes to these files apply the next time you lasso something; no reinstall needed.
+The package ships with no API key, and nothing is sent anywhere except the Anthropic API.
 
 ## How it works
 
 - `src/captura.js` takes a PNG of the lasso selection (`generateLassoPreview`).
 - `src/claude.mjs` sends it to the Messages API with code execution enabled. The built-in system
   prompt (math as LaTeX, e-ink friendly drawings, how to put things on the page) is combined with
-  the user's `superclaude-prompt.txt`.
+  the user's own instructions from Settings.
 - `src/matematica.js` typesets the LaTeX with plain React Native `Text`/`View` (KaTeX is used only
   as a parser): plugins have no WebView or SVG.
 - Drawings are made by Claude with matplotlib in Anthropic's code execution sandbox. Next to each
@@ -56,8 +60,8 @@ Changes to these files apply the next time you lasso something; no reinstall nee
   renderer), and `src/insertar.js` inserts those as pen strokes and text boxes. Plugins cannot write
   files, so inserting the PNG itself is not possible.
 - Plugins lose their memory when their window is hidden, and cannot write files. `src/memoria.mjs`
-  keeps the last conversation as folder names in the plugin's private folder. Unusual, but it only
-  uses the SDK's `FileUtils`.
+  keeps the last conversation, and `src/ajustes.js` the settings, as folder names in the plugin's
+  private folder. Unusual, but it only uses the SDK's `FileUtils`.
 
 Some of this relies on undocumented SDK behavior and may break with a firmware update.
 
@@ -69,7 +73,7 @@ npm run build:plugin        # → build/outputs/superclaude.snplg (no API key in
 ```
 
 No Android SDK needed: the plugin has no native code, so the package is the JS bundle, the icon,
-`PluginConfig.json` and the config templates (`plantillas/`), zipped.
+`PluginConfig.json`, zipped.
 
 To try the same request the tablet makes, from a computer:
 

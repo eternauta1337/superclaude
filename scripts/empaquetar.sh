@@ -10,15 +10,12 @@ nombre="$(node -p "require('./package.json').name")"
 gen=build/generated
 out=build/outputs
 
-node scripts/clave.mjs
 
 rm -rf "$gen" && mkdir -p "$gen" "$out"
 npx react-native bundle --entry-file index.js --platform android --dev false \
   --bundle-output "$gen/$nombre.bundle" --assets-dest "$gen"
 
 cp assets/icon.png "$gen/icon.png"
-# las plantillas de la configuración: el plugin las copia a MyStyle la primera vez
-cp -r plantillas "$gen/plantillas"
 node -e '
   const fs = require("fs");
   const cfg = JSON.parse(fs.readFileSync("PluginConfig.json", "utf8"));

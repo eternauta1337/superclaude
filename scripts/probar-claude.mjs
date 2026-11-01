@@ -1,21 +1,21 @@
 // Prueba desde la compu el mismo pedido que hace la tablet, con un PNG cualquiera:
 //   node scripts/probar-claude.mjs muestra.png ["repregunta"]
-// Con SUPERCLAUDE_PROMPT=archivo.txt usa ese prompt de usuario (como el
-// superclaude-prompt.txt de la tablet).
+// Con SUPERCLAUDE_PROMPT=archivo.txt usa ese prompt de usuario (lo mismo que
+// "Tus instrucciones para Claude" en Ajustes).
 // Los dibujos que haga Claude quedan al lado del PNG: muestra-dibujo-1.png y
 // muestra-dibujo-1.trazos.json (lo que se insertaría en la hoja), ...
 import {readFileSync, writeFileSync} from 'node:fs';
 import {bajarDibujos, mensajeConImagen, preguntar} from '../src/claude.mjs';
-import {leerClave} from './clave.mjs';
+
 
 const [png, repregunta] = process.argv.slice(2);
 if (!png) {
   console.error('Uso: node scripts/probar-claude.mjs imagen.png ["repregunta"]');
   process.exit(2);
 }
-const clave = leerClave();
+const clave = (process.env.SUPERCLAUDE_API_KEY || '').trim();
 if (!clave) {
-  console.error('Sin clave (ver scripts/clave.mjs).');
+  console.error('Falta la clave: SUPERCLAUDE_API_KEY=sk-ant-… node scripts/probar-claude.mjs …');
   process.exit(1);
 }
 

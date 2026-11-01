@@ -1,7 +1,7 @@
 // El estado de la ventana: una conversación por toque del botón. index.js la
 // arranca y App.js la dibuja y la sigue.
 import {FileUtils, PluginManager} from 'sn-plugin-lib';
-import {cargarConfig} from './config';
+import {cargarAjustes, nivelActual} from './ajustes';
 import {t} from './textos.mjs';
 import {
   bajarDibujos,
@@ -49,7 +49,7 @@ let hoja = null; // {ruta, pagina, lazo}: dónde insertar los dibujos
 let generacion = 0; // descarta respuestas de una conversación vieja
 let pendiente = null; // {mensaje, pregunta} mientras Claude piensa
 let revivida = false; // reabrir() ya trajo la guardada
-let config = null; // superclaude-*.txt/json: clave, prompt, modelo (ver config.js)
+let config = null; // los ajustes: clave, prompt, nivel (ver ajustes.js)
 let rutaLazo = null; // lazo.png en el directorio del plugin: la foto se relee de ahí
 let guardados = 0; // para apagar "guardando…" sólo con el último
 const oyentes = new Set();
@@ -77,9 +77,10 @@ export async function empezar(origen) {
   poner({ocupado: true});
   try {
     await pedirPermisos();
-    config = await cargarConfig();
+    config = await cargarAjustes();
     if (!config.clave) {
-      throw new Error(t('noKey', {carpeta: config.carpeta}));
+      poner({faltaClave: true});
+      throw new Error(t('noKey'));
     }
     let primero;
     if (origen === 'texto') {
@@ -126,12 +127,13 @@ async function turno(yo, mensaje, pregunta) {
   // piensa, la tablet corta el pedido, y al reabrir se vuelve a mandar.
   pendiente = {mensaje, pregunta};
   guardarTodo();
+  config = await cargarAjustes(); // por si cambiaron la clave o el nivel en Ajustes
   const r = await preguntar({
     clave: config.clave,
     messages: [...mensajes, mensaje],
     contenedor,
-    modelo: config.modelo,
-    esfuerzo: config.esfuerzo,
+    modelo: nivelActual().modelo,
+    esfuerzo: nivelActual().esfuerzo,
     promptUsuario: config.prompt,
   });
   if (yo !== generacion) {
@@ -266,7 +268,7 @@ export async function reabrir() {
   let datos = null;
   try {
     await pedirPermisos();
-    config = await cargarConfig();
+    config = await cargarAjustes();
     datos = config.clave ? await (await laMemoria()).recuperar() : null;
     if (datos) {
       rutaLazo = datos.rutaLazo || null;

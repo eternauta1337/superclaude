@@ -1,5 +1,6 @@
 // La ventana: lo que seleccionó arriba, la conversación al medio y una caja
-// para repreguntar abajo. Blanco y negro, letra grande: es tinta electrónica.
+// para repreguntar abajo; o la pantalla de Ajustes. Blanco y negro, letra
+// grande: es tinta electrónica.
 import React, {useEffect, useState} from 'react';
 import {
   Image,
@@ -11,24 +12,30 @@ import {
   View,
 } from 'react-native';
 import {PluginManager} from 'sn-plugin-lib';
+import {cargarAjustes, escucharAjustes, guardarAjustes} from './src/ajustes';
 import {escuchar, insertar, reabrir, repreguntar} from './src/conversacion';
 import {TextoConMate} from './src/matematica';
+import {Niveles, PantallaAjustes} from './src/PantallaAjustes';
 import {t} from './src/textos.mjs';
+import {escucharVista, mostrar} from './src/vista';
 import {versionName as VERSION} from './PluginConfig.json';
 
 export default function App() {
   const [estado, setEstado] = useState(null);
+  const [ajustes, setAjustes] = useState(null);
+  const [vista, setVista] = useState('chat');
   const [pregunta, setPregunta] = useState('');
 
   useEffect(() => {
-    const dejar = escuchar(setEstado);
+    const dejar = [escuchar(setEstado), escucharAjustes(a => setAjustes({...a})), escucharVista(setVista)];
+    cargarAjustes();
     // Al ocultar, la tablet tira el JS: si la ventana aparece sin nada en
     // memoria, se trae la conversación guardada (no hace nada si ya está).
     reabrir();
-    return dejar;
+    return () => dejar.forEach(f => f());
   }, []);
 
-  if (!estado) {
+  if (!estado || !ajustes) {
     return null;
   }
   const {ocupado, imagen, seleccion, turnos, error} = estado;
@@ -46,75 +53,96 @@ export default function App() {
             SuperClaude <Text style={s.version}>{VERSION}</Text>
             {estado.guardando ? <Text style={s.version}>  · {t('saving')}</Text> : null}
           </Text>
-          {/* la conversación queda guardada: vuelve con el botón SuperClaude de la barra */}
-          <Pressable onPress={() => PluginManager.closePluginView()} style={s.boton}>
-            <Text style={s.botonTexto}>{t('hide')}</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          style={s.cuerpo}
-          contentContainerStyle={s.cuerpoAdentro}
-          persistentScrollbar>
-          {imagen ? (
-            <Image source={{uri: imagen}} style={s.imagen} resizeMode="contain" />
-          ) : null}
-          {seleccion ? <Text style={s.seleccion}>“{seleccion}”</Text> : null}
-
-          {turnos.map((t, i) => (
-            <View key={i} style={s.turno}>
-              {t.pregunta ? <Text style={s.pregunta}>› {t.pregunta}</Text> : null}
-              <TextoConMate texto={t.respuesta} style={s.respuesta} />
-              {(t.dibujos || []).map((d, j) => (
-                <View key={j} style={s.dibujoCaja}>
-                  <Image source={{uri: d.uri}} style={s.dibujo} resizeMode="contain" />
-                  {d.trazos ? (
-                    <Pressable
-                      onPress={() => insertar(i, j)}
-                      disabled={d.estado === 'insertando'}
-                      style={[s.boton, s.insertar]}>
-                      <Text style={s.botonTexto}>
-                        {d.estado === 'insertando'
-                          ? t('inserting')
-                          : d.estado === 'insertado'
-                          ? t('insertAgain')
-                          : t('insert')}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {d.nota ? <Text style={s.nota}>{d.nota}</Text> : null}
-                </View>
-              ))}
-            </View>
-          ))}
-
-          {!ocupado && !error && turnos.length === 0 ? (
-            <Text style={s.nota}>{t('empty')}</Text>
-          ) : null}
-          {ocupado ? (
-            <Text style={s.nota}>
-              {estado.recuperando ? t('recovering') : t('thinking')}
-            </Text>
-          ) : null}
-          {error ? <Text style={s.error}>{t('couldNot', {error})}</Text> : null}
-        </ScrollView>
-
-        {turnos.length > 0 ? (
-          <View style={s.pie}>
-            <TextInput
-              style={s.entrada}
-              value={pregunta}
-              onChangeText={setPregunta}
-              onSubmitEditing={mandar}
-              placeholder={t('askAgain')}
-              editable={!ocupado}
-              returnKeyType="send"
-            />
-            <Pressable onPress={mandar} disabled={ocupado} style={s.boton}>
-              <Text style={s.botonTexto}>{t('send')}</Text>
+          <View style={s.fila}>
+            {vista === 'chat' ? (
+              <>
+                <Niveles nivel={ajustes.nivel} onCambiar={nivel => guardarAjustes({nivel})} />
+                <Pressable onPress={() => mostrar('ajustes')} style={[s.boton, s.separado]}>
+                  <Text style={s.botonTexto}>⚙</Text>
+                </Pressable>
+              </>
+            ) : null}
+            {/* la conversación queda guardada: vuelve con el botón SuperClaude de la barra */}
+            <Pressable onPress={() => PluginManager.closePluginView()} style={s.boton}>
+              <Text style={s.botonTexto}>{t('hide')}</Text>
             </Pressable>
           </View>
-        ) : null}
+        </View>
+
+        {vista === 'ajustes' ? (
+          <PantallaAjustes ajustes={ajustes} onVolver={() => mostrar('chat')} />
+        ) : (
+          <>
+            <ScrollView
+              style={s.cuerpo}
+              contentContainerStyle={s.cuerpoAdentro}
+              persistentScrollbar>
+              {imagen ? (
+                <Image source={{uri: imagen}} style={s.imagen} resizeMode="contain" />
+              ) : null}
+              {seleccion ? <Text style={s.seleccion}>“{seleccion}”</Text> : null}
+
+              {turnos.map((tu, i) => (
+                <View key={i} style={s.turno}>
+                  {tu.pregunta ? <Text style={s.pregunta}>› {tu.pregunta}</Text> : null}
+                  <TextoConMate texto={tu.respuesta} style={s.respuesta} />
+                  {(tu.dibujos || []).map((d, j) => (
+                    <View key={j} style={s.dibujoCaja}>
+                      <Image source={{uri: d.uri}} style={s.dibujo} resizeMode="contain" />
+                      {d.trazos ? (
+                        <Pressable
+                          onPress={() => insertar(i, j)}
+                          disabled={d.estado === 'insertando'}
+                          style={[s.boton, s.insertar]}>
+                          <Text style={s.botonTexto}>
+                            {d.estado === 'insertando'
+                              ? t('inserting')
+                              : d.estado === 'insertado'
+                              ? t('insertAgain')
+                              : t('insert')}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {d.nota ? <Text style={s.nota}>{d.nota}</Text> : null}
+                    </View>
+                  ))}
+                </View>
+              ))}
+
+              {!ocupado && !error && turnos.length === 0 ? (
+                <Text style={s.nota}>{t('empty')}</Text>
+              ) : null}
+              {ocupado ? (
+                <Text style={s.nota}>
+                  {estado.recuperando ? t('recovering') : t('thinking')}
+                </Text>
+              ) : null}
+              {error ? <Text style={s.error}>{t('couldNot', {error})}</Text> : null}
+              {estado.faltaClave && !ajustes.clave ? (
+                <Pressable onPress={() => mostrar('ajustes')} style={[s.boton, s.insertar]}>
+                  <Text style={s.botonTexto}>⚙ {t('settings')}</Text>
+                </Pressable>
+              ) : null}
+            </ScrollView>
+
+            {turnos.length > 0 ? (
+              <View style={s.pie}>
+                <TextInput
+                  style={s.entrada}
+                  value={pregunta}
+                  onChangeText={setPregunta}
+                  onSubmitEditing={mandar}
+                  placeholder={t('askAgain')}
+                  editable={!ocupado}
+                  returnKeyType="send"
+                />
+                <Pressable onPress={mandar} disabled={ocupado} style={s.boton}>
+                  <Text style={s.botonTexto}>{t('send')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
+        )}
       </View>
     </View>
   );
@@ -138,6 +166,8 @@ const s = StyleSheet.create({
     borderBottomWidth: 2,
     borderColor: '#000',
   },
+  fila: {flexDirection: 'row', alignItems: 'center'},
+  separado: {marginHorizontal: 12},
   titulo: {fontSize: 30, fontWeight: '700', color: '#000'},
   // la versión a la vista: así se sabe si la tablet tomó la actualización
   version: {fontSize: 18, fontWeight: 'normal'},

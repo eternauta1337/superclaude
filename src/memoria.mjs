@@ -20,9 +20,10 @@ const EN_PARALELO = 40; // carpetas creadas a la vez: de a una, guardar tardaba 
 
 // fs: {makeDir, listFiles, deleteDir, renameToFile, dir}. En la tablet es el
 // FileUtils de sn-plugin-lib; en la compu, uno sobre node:fs (scripts/probar-memoria.mjs).
-export function crearMemoria(fs) {
-  const viva = `${fs.dir}/memoria`;
-  const nueva = `${fs.dir}/memoria-nueva`;
+// nombre: la carpeta (la conversación va en "memoria", los ajustes en "ajustes").
+export function crearMemoria(fs, nombre = 'memoria') {
+  const viva = `${fs.dir}/${nombre}`;
+  const nueva = `${fs.dir}/${nombre}-nueva`;
   let cola = Promise.resolve();
   let proximo = null; // lo último que pidieron guardar y todavía no se escribió
 
