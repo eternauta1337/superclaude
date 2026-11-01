@@ -26,8 +26,8 @@ any other server.
 
 ## Install
 
-1. Copy `superclaude.snplg` into the `MyStyle` folder on the tablet (USB, Browse & Access, or
-   Supernote Cloud).
+1. Download `superclaude.snplg` from the [latest release](../../releases/latest) and copy it into
+   the `MyStyle` folder on the tablet (USB, Browse & Access, or Supernote Cloud).
 2. On the tablet: Settings → Apps → Plugins → Add plugin → SuperClaude.
 3. Open the plugin's settings: the config button next to SuperClaude in Settings → Apps → Plugins,
    or ⚙ in the SuperClaude window. There you set:
@@ -58,7 +58,8 @@ The package ships with no API key, and nothing is sent anywhere except the Anthr
 - Drawings are made by Claude with matplotlib in Anthropic's code execution sandbox. Next to each
   PNG it exports the figure as polylines and labels (`src/trazos_py.mjs`, a small matplotlib
   renderer), and `src/insertar.js` inserts those as pen strokes and text boxes. Plugins cannot write
-  files, so inserting the PNG itself is not possible.
+  files, so inserting the PNG itself is not possible. These files live in your Anthropic account's
+  Files API storage; the ones from a conversation are deleted when a new lasso replaces it.
 - Plugins lose their memory when their window is hidden, and cannot write files. `src/memoria.mjs`
   keeps the last conversation, and `src/ajustes.js` the settings, as folder names in the plugin's
   private folder. Unusual, but it only uses the SDK's `FileUtils`.

@@ -251,6 +251,18 @@ export async function subirImagen({clave, archivo, timeoutMs = 60000}) {
   return cuerpo.id;
 }
 
+// Los archivos que dejó Claude (dibujos y sus trazos) no vencen solos: se
+// borran cuando la conversación que los usaba se reemplaza.
+export async function borrarArchivo({clave, fileId, timeoutMs = 30000}) {
+  await conTimeout(timeoutMs, signal =>
+    fetch(`${URL_API}/files/${fileId}`, {
+      method: 'DELETE',
+      signal,
+      headers: {'x-api-key': clave, 'anthropic-version': '2023-06-01'},
+    }),
+  );
+}
+
 async function leerJson(res) {
   const crudo = await res.text();
   let cuerpo = null;

@@ -5,6 +5,7 @@ import {cargarAjustes, nivelActual} from './ajustes';
 import {t} from './textos.mjs';
 import {
   bajarDibujos,
+  borrarArchivo,
   mensajeConArchivo,
   mensajeConImagen,
   mensajeConTexto,
@@ -68,6 +69,7 @@ function poner(cambios) {
 // origen: 'lazo' | 'texto'
 export async function empezar(origen) {
   const yo = ++generacion;
+  const anteriores = estado.turnos;
   mensajes = [];
   contenedor = null;
   hoja = null;
@@ -82,6 +84,15 @@ export async function empezar(origen) {
       poner({faltaClave: true});
       throw new Error(t('noKey'));
     }
+    // Los dibujos de la conversación que se reemplaza se borran de la Files
+    // API (no vencen solos). Si la memoria se perdió al ocultar, salen de la
+    // guardada, que se lee antes de que la nueva la pise.
+    const viejos = anteriores.length
+      ? anteriores
+      : (await (await laMemoria()).recuperar().catch(() => null))?.estado?.turnos || [];
+    viejos
+      .flatMap(tu => tu.archivos || [])
+      .forEach(fileId => borrarArchivo({clave: config.clave, fileId}).catch(() => null));
     let primero;
     if (origen === 'texto') {
       const seleccion = await textoSeleccionado();
