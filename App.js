@@ -4,11 +4,13 @@
 import React, {useEffect, useState} from 'react';
 import {
   Image,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {PluginManager} from 'sn-plugin-lib';
@@ -25,6 +27,12 @@ export default function App() {
   const [ajustes, setAjustes] = useState(null);
   const [vista, setVista] = useState('chat');
   const [pregunta, setPregunta] = useState('');
+  // Con el teclado abierto la ventana sube arriba y se achica a lo que queda
+  // libre, para que se vea lo que se escribe. Si la tablet no avisa la altura
+  // del teclado, se supone media pantalla.
+  const [escribiendo, setEscribiendo] = useState(false);
+  const [teclado, setTeclado] = useState(0);
+  const {height: alto} = useWindowDimensions();
 
   useEffect(() => {
     const dejar = [escuchar(setEstado), escucharAjustes(a => setAjustes({...a})), escucharVista(setVista)];
@@ -32,22 +40,37 @@ export default function App() {
     // Al ocultar, la tablet tira el JS: si la ventana aparece sin nada en
     // memoria, se trae la conversación guardada (no hace nada si ya está).
     reabrir();
+    const mostrado = Keyboard.addListener('keyboardDidShow', e => setTeclado(e?.endCoordinates?.height || 0));
+    const oculto = Keyboard.addListener('keyboardDidHide', () => {
+      setTeclado(0);
+      setEscribiendo(false);
+    });
+    dejar.push(() => mostrado.remove(), () => oculto.remove());
     return () => dejar.forEach(f => f());
   }, []);
 
   if (!estado || !ajustes) {
     return null;
   }
-  const {ocupado, imagen, seleccion, turnos, error} = estado;
+  const {ocupado, imagen, seleccion, turnos, error, listo, esperando} = estado;
 
   const mandar = () => {
+    if (!pregunta.trim() || ocupado) {
+      return;
+    }
     repreguntar(pregunta);
     setPregunta('');
+    Keyboard.dismiss();
   };
 
+  const conTeclado = escribiendo || teclado > 0;
+  const libre = alto - (teclado > 0 ? teclado : alto * 0.5);
+  const arriba = conTeclado ? {justifyContent: 'flex-start', paddingTop: 16} : null;
+  const achica = conTeclado ? {maxHeight: Math.max(240, libre - 32)} : null;
+
   return (
-    <View style={s.fondo}>
-      <View style={s.ventana}>
+    <View style={[s.fondo, arriba]}>
+      <View style={[s.ventana, achica]}>
         <View style={s.barra}>
           <Text style={s.titulo}>
             SuperClaude <Text style={s.version}>{VERSION}</Text>
@@ -110,8 +133,9 @@ export default function App() {
               ))}
 
               {!ocupado && !error && turnos.length === 0 ? (
-                <Text style={s.nota}>{t('empty')}</Text>
+                <Text style={s.nota}>{listo ? t('whatToDo') : t('empty')}</Text>
               ) : null}
+              {esperando ? <Text style={s.pregunta}>› {esperando}</Text> : null}
               {ocupado ? (
                 <Text style={s.nota}>
                   {estado.recuperando ? t('recovering') : t('thinking')}
@@ -125,15 +149,19 @@ export default function App() {
               ) : null}
             </ScrollView>
 
-            {turnos.length > 0 ? (
+            {turnos.length > 0 || listo ? (
               <View style={s.pie}>
                 <TextInput
                   style={s.entrada}
                   value={pregunta}
                   onChangeText={setPregunta}
                   onSubmitEditing={mandar}
-                  placeholder={t('askAgain')}
+                  onFocus={() => setEscribiendo(true)}
+                  onBlur={() => setEscribiendo(false)}
+                  placeholder={turnos.length > 0 ? t('askAgain') : t('askFirst')}
                   editable={!ocupado}
+                  multiline
+                  blurOnSubmit
                   returnKeyType="send"
                 />
                 <Pressable onPress={mandar} disabled={ocupado} style={s.boton}>
@@ -193,8 +221,11 @@ const s = StyleSheet.create({
     borderTopWidth: 2,
     borderColor: '#000',
   },
+  // varias líneas, hasta un tope: una pregunta larga se ve entera
   entrada: {
     flex: 1,
+    maxHeight: 160,
+    textAlignVertical: 'top',
     fontSize: 26,
     borderWidth: 2,
     borderColor: '#000',

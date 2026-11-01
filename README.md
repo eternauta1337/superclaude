@@ -2,13 +2,17 @@
 
 Lasso anything on your Supernote and ask Claude about it.
 
-Select handwriting, a sketch or a piece of a PDF with the lasso, tap **SuperClaude**, and Claude
-looks at it: it solves the calculation, answers the question, or tells you what it sees. The answer
-opens in a window, with the math typeset, and you can keep asking follow-ups.
+Select handwriting, a sketch or a piece of a PDF with the lasso, tap **SuperClaude**, write what you
+want ("solve it", "what does this mean?", "draw it"), and Claude looks at it. The answer opens in a
+window, with the math typeset, and you can keep asking follow-ups. Claude also gets the whole page as
+context (the exercise statement, earlier steps, the topic), while the window shows only your
+selection.
 
 - **Calculator and tutor**: equations, integrals, unit conversions, step by step.
 - **Charts and drawings**: ask for a graph (2D or 3D) or a line drawing of anything; it shows up in
   the window, and **Insert on page** puts it on your page as real ink strokes you can move and erase.
+  In notes it goes to its own **SuperClaude** layer and is left selected, so you can drag it away
+  from what's under it. That layer stays active afterwards: switch back to Main to keep writing there.
 - **Put it on the page**: ask "write the result on the page" and it lands below your selection, plain
   text as an editable text box and formulas as ink.
 - **Hide and come back**: hide the window to keep writing, and reopen the conversation from the
@@ -49,7 +53,9 @@ The package ships with no API key, and nothing is sent anywhere except the Anthr
 
 ## How it works
 
-- `src/captura.js` takes a PNG of the lasso selection (`generateLassoPreview`).
+- `src/captura.js` takes a PNG of the lasso selection (`generateLassoPreview`) and one of the whole
+  page (`generateNotePng` after `saveCurrentNote`, or `generateCurrentDocImage` in a PDF/EPUB); the
+  page goes as a second image with the selection's position, only as context.
 - `src/claude.mjs` sends it to the Messages API with code execution enabled. The built-in system
   prompt (math as LaTeX, e-ink friendly drawings, how to put things on the page) is combined with
   the user's own instructions from Settings.

@@ -26,6 +26,7 @@ export const SISTEMA = String.raw`You receive snippets of what the user handwrit
 - If it is a question, answer it.
 - If there is no clear request, say in one line what you see and what you can do with it.
 - If something is illegible, say what you understood instead of guessing.
+The whole page may come too, as the last image: it is only context. Answer about the selection, and use the page to understand it (what the exercise asks, the notation, earlier steps, the topic); do not describe the rest of the page unless asked.
 Unless the user's instructions below say otherwise, answer in the language the user writes in.
 The answer is read on an e-ink screen, in a small window. Be brief. No markdown (no bold, no headings, no asterisk lists).
 Math goes in LaTeX and the window renders it: $...$ inline (for example $\frac{a}{b}$, $x^2$, $\sqrt{2}$, $\alpha$) and $$...$$ on its own line for a key calculation or result. Use LaTeX for every math expression, even short ones; for a dollar sign write \$.
@@ -85,6 +86,21 @@ export function mensajeConTexto(seleccion, texto) {
     role: 'user',
     content: `Selected text:\n"""\n${seleccion}\n"""\n\n${texto || 'Look at this.'}`,
   };
+}
+
+// Suma la página entera al primer mensaje, como última imagen, con una nota
+// de dónde está la selección.
+export function conPagina(mensaje, base64, lugar) {
+  const pct = v => Math.round(Math.max(0, Math.min(1, v)) * 100);
+  const donde = lugar
+    ? ` The selection is the area from ${pct(lugar.x0)}% to ${pct(lugar.x1)}% across and ${pct(lugar.y0)}% to ${pct(lugar.y1)}% down the page.`
+    : '';
+  const nota = `The last image is the whole page the selection comes from, only as context.${donde}`;
+  const content = typeof mensaje.content === 'string' ? [{type: 'text', text: mensaje.content}] : [...mensaje.content];
+  const i = content.findIndex(b => b.type === 'text');
+  const img = {type: 'image', source: {type: 'base64', media_type: 'image/png', data: base64}};
+  content.splice(i < 0 ? content.length : i, 0, img, {type: 'text', text: nota});
+  return {...mensaje, content};
 }
 
 // Manda la conversación y devuelve {texto, archivos, mensaje, contenedor, uso}.

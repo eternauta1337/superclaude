@@ -47,6 +47,11 @@ export async function insertarDibujo(dibujo, ctx) {
   const lapicera = await PluginCommAPI.getPenInfo();
   const ancho = Math.max(100, lapicera?.success ? lapicera.result?.width || 200 : 200);
 
+  // En una nota, el dibujo va a su capa, que queda activa: el lazo es por
+  // área pero sólo toma la capa activa, así que agarra el dibujo y no lo que
+  // había abajo. Si no hay lugar para otra capa, va a la que esté activa.
+  const capa = /\.note$/i.test(ctx.ruta) ? await capaPropia(ctx).catch(() => null) : null;
+
   const elementos = [];
   try {
     for (const t of dibujo.trazos) {
@@ -70,6 +75,7 @@ export async function insertarDibujo(dibujo, ctx) {
       const res = await PluginCommAPI.insertPageElements(
         elementos.slice(i, i + POR_TANDA),
         ctx.pagina,
+        capa,
       );
       if (!res?.success) {
         throw new Error(res?.error?.message || t('cannotInsertStrokes'));
@@ -107,8 +113,8 @@ export async function insertarDibujo(dibujo, ctx) {
   }
   await PluginNoteAPI.saveCurrentNote?.();
 
-  // Queda seleccionado, para moverlo si pisa algo. El lazo es por área: si
-  // abajo había algo, también entra.
+  // Queda seleccionado, para moverlo si pisa algo. Sin capa propia, lo que
+  // había abajo también entra.
   const caja = lugar.caja();
   const seleccionado = await PluginCommAPI.lassoElements({
     left: Math.max(0, Math.floor(caja.left - 8)),
@@ -116,7 +122,62 @@ export async function insertarDibujo(dibujo, ctx) {
     right: Math.min(hoja.width, Math.ceil(caja.right + 8)),
     bottom: Math.min(hoja.height, Math.ceil(caja.bottom + 8)),
   }).catch(() => null);
-  return {trazos: elementos.length, rotulos, seleccionado: !!seleccionado?.success};
+  return {trazos: elementos.length, rotulos, seleccionado: !!seleccionado?.success, capa};
+}
+
+const CAPA = 'SuperClaude';
+
+// La capa "SuperClaude" de la página (la crea si falta, en el primer lugar
+// libre: una página tiene Main y hasta tres más) y la deja activa. Devuelve
+// su número, o null si no hay lugar.
+async function capaPropia(ctx) {
+  await PluginNoteAPI.saveCurrentNote?.();
+  const leer = async () => {
+    const res = await PluginFileAPI.getLayers(ctx.ruta, ctx.pagina);
+    if (!res?.success || !Array.isArray(res.result)) {
+      throw new Error(res?.error?.message || 'getLayers');
+    }
+    return res.result;
+  };
+  let capas = await leer();
+  let mia = capas.find(c => c.name === CAPA);
+  if (!mia) {
+    const libre = [1, 2, 3].find(id => !capas.some(c => c.layerId === id));
+    if (libre == null) {
+      return null;
+    }
+    const res = await PluginFileAPI.insertLayer(ctx.ruta, ctx.pagina, {
+      layerId: libre,
+      name: CAPA,
+      isCurrentLayer: true,
+      isVisible: true,
+    });
+    if (!res?.success || res.result === false) {
+      return null;
+    }
+    capas = await leer();
+    mia = capas.find(c => c.name === CAPA);
+    if (!mia) {
+      return null;
+    }
+  }
+  if (!mia.isCurrentLayer || !mia.isVisible) {
+    const res = await PluginFileAPI.modifyLayers(
+      ctx.ruta,
+      ctx.pagina,
+      capas.map(c => ({
+        layerId: c.layerId,
+        name: c.name,
+        isCurrentLayer: c.layerId === mia.layerId,
+        isVisible: c.layerId === mia.layerId ? true : c.isVisible !== false,
+      })),
+    );
+    if (!res?.success || res.result === false) {
+      return null;
+    }
+  }
+  await PluginCommAPI.reloadFile?.().catch(() => null);
+  return mia.layerId;
 }
 
 // Recorta la figura a lo que tiene dibujado y la acomoda debajo de la
