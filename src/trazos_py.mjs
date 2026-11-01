@@ -118,11 +118,24 @@ class _Grabador(RendererBase):
                     self.trazos.append({'p': pts + [pts[0]], 'g': round(grosor, 2), 'c': color, 'glifo': True})
             return
         ancho, alto, desc = self.get_text_width_height_descent(s, prop, ismath)
+        # además, el contorno de sus letras: cuando el rótulo no puede ir como caja de texto
+        # (en la capa propia del dibujo, en un PDF), el plugin lo pone como tinta
+        t2p = TextToPath()
+        verts, codes = t2p.get_text_path(prop, s, ismath=False)
+        tam = self.points_to_pixels(prop.get_size_in_points())
+        k = tam / t2p.FONT_SCALE
+        transform = Affine2D().scale(k).rotate_deg(angle).translate(x, self.h - y)
+        glifos = []
+        for poly in Path(verts, codes).to_polygons(transform, closed_only=False):
+            pts = [[round(float(px), 1), round(float(self.h - py), 1)] for px, py in poly]
+            if len(pts) >= 2:
+                glifos.append(pts + [pts[0]])
         # con flipy() (el default) matplotlib ya pasa la y del texto desde arriba
         self.textos.append({'x': round(float(x), 1), 'base': round(float(y), 1),
-                            't': s, 'tam': round(self.points_to_pixels(prop.get_size_in_points()), 1),
+                            't': s, 'tam': round(tam, 1),
                             'ancho': round(float(ancho), 1), 'alto': round(float(alto), 1),
-                            'desc': round(float(desc), 1), 'ang': float(angle)})
+                            'desc': round(float(desc), 1), 'ang': float(angle),
+                            'glifos': glifos, 'g': round(tam * 0.045, 2), 'c': color})
 
 def exportar_trazos(fig, nombre):
     """Guarda <nombre>.trazos.json en $OUTPUT_DIR, al lado de <nombre>.png."""

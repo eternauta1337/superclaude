@@ -11,6 +11,8 @@ import {
   mensajeConImagen,
   mensajeConTexto,
   preguntar,
+  REVISION,
+  subirModulos,
   subirImagen,
   sugerir,
 } from './claude.mjs';
@@ -112,7 +114,7 @@ export async function empezar(origen) {
       ? anteriores
       : (await (await laMemoria()).recuperar().catch(() => null))?.estado?.turnos || [];
     viejos
-      .flatMap(tu => tu.archivos || [])
+      .flatMap(tu => [...(tu.archivos || []), ...(tu.subidos || [])])
       .forEach(fileId => borrarArchivo({clave: config.clave, fileId}).catch(() => null));
     let primero;
     let ctx;
@@ -156,42 +158,100 @@ export async function repreguntar(pregunta) {
     await turno(yo, mensajes.length === 0 ? conPregunta(borrador, p) : {role: 'user', content: p}, p);
   } catch (e) {
     if (yo === generacion) {
-      poner({ocupado: false, esperando: null, error: texto(e)});
+      poner({ocupado: false, esperando: null, fase: null, error: texto(e)});
     }
   }
   return true;
 }
 
 async function turno(yo, mensaje, pregunta) {
+  poner({esperando: pregunta});
+  config = await cargarAjustes(); // por si cambiaron la clave o el nivel en Ajustes
+  // La primera pregunta lleva los módulos de dibujo, que quedan en el
+  // contenedor para toda la conversación. Si no suben, se pregunta igual:
+  // sólo los dibujos van a fallar.
+  const lista = c => (typeof c === 'string' ? [{type: 'text', text: c}] : c);
+  let sinModulos = null;
+  if (mensajes.length === 0 && !lista(mensaje.content).some(b => b.type === 'container_upload')) {
+    try {
+      const m = await subirModulos({clave: config.clave});
+      mensaje = {...mensaje, content: [...m.bloques, ...lista(mensaje.content)]};
+    } catch (e) {
+      console.warn('[superclaude] no subieron los módulos de dibujo', e);
+      sinModulos = texto(e);
+    }
+  }
   // Se guarda antes de preguntar: si se oculta la ventana mientras Claude
   // piensa, la tablet corta el pedido, y al reabrir se vuelve a mandar.
   pendiente = {mensaje, pregunta};
-  poner({esperando: pregunta});
   guardarTodo();
-  config = await cargarAjustes(); // por si cambiaron la clave o el nivel en Ajustes
-  const r = await preguntar({
-    clave: config.clave,
-    messages: [...mensajes, mensaje],
-    contenedor,
-    modelo: nivelActual().modelo,
-    esfuerzo: nivelActual().esfuerzo,
-    promptUsuario: config.prompt,
-    idioma: config.idioma,
-  });
+  const nivel = nivelActual();
+  const pedir = (messages, cont) =>
+    preguntar({
+      clave: config.clave,
+      messages,
+      contenedor: cont,
+      modelo: nivel.modelo,
+      esfuerzo: nivel.esfuerzo,
+      maxTokens: nivel.maxTokens,
+      revisa: !!nivel.revisa,
+      promptUsuario: config.prompt,
+      idioma: config.idioma,
+      alAvanzar: fase => yo === generacion && estado.fase !== fase && poner({fase}),
+    });
+  const r = await pedir([...mensajes, mensaje], contenedor);
   if (yo !== generacion) {
     return;
   }
   pendiente = null;
   borrador = null;
-  mensajes = [...mensajes, mensaje, r.mensaje];
+  // los módulos van en el primer mensaje (también si se reenvió al reabrir)
+  const delPrimero =
+    mensajes.length === 0 ? lista(mensaje.content).filter(b => b.type === 'container_upload').map(b => b.file_id) : [];
+  mensajes = [...mensajes, mensaje, ...r.mensajes];
   contenedor = r.contenedor;
   let respuesta = r.texto;
+  if (sinModulos) {
+    respuesta += `\n\n(${t('noModules', {error: sinModulos})})`;
+  }
+  let archivos = r.archivos;
+  const subidos = [...delPrimero, ...r.subidos];
   let dibujos = [];
-  if (r.archivos.length) {
+  if (archivos.length) {
     try {
-      dibujos = await bajarDibujos({clave: config.clave, ids: r.archivos});
+      dibujos = await bajarDibujos({clave: config.clave, ids: archivos});
     } catch (e) {
       respuesta += `\n\n(${t('couldNotDownload', {error: texto(e)})})`;
+    }
+  }
+  // Best: Claude mira cómo le quedaron los dibujos (no lo que va a la hoja
+  // sin pedirlo) y los rehace si puede mejorarlos. Si la revisión falla, vale
+  // lo que ya había.
+  const aRevisar = dibujos.filter(d => !/^hoja/i.test(d.nombre));
+  if (nivel.revisa && aRevisar.length && yo === generacion) {
+    poner({fase: 'reviewing'});
+    try {
+      const revision = {
+        role: 'user',
+        content: [
+          // por file_id y no en base64: la conversación se guarda en la tablet
+          ...aRevisar.map(d => ({type: 'image', source: {type: 'file', file_id: d.id}})),
+          {type: 'text', text: REVISION},
+        ],
+      };
+      const r2 = await pedir([...mensajes, revision], contenedor);
+      if (yo !== generacion) {
+        return;
+      }
+      mensajes = [...mensajes, revision, ...r2.mensajes];
+      contenedor = r2.contenedor;
+      subidos.push(...r2.subidos);
+      if (r2.archivos.length) {
+        archivos = [...archivos, ...r2.archivos];
+        dibujos = await bajarDibujos({clave: config.clave, ids: archivos});
+      }
+    } catch (e) {
+      console.warn('[superclaude] la revisión falló', e);
     }
   }
   if (yo !== generacion) {
@@ -200,9 +260,10 @@ async function turno(yo, mensaje, pregunta) {
   poner({
     ocupado: false,
     esperando: null,
+    fase: null,
     listo: false,
     sugerencia: null,
-    turnos: [...estado.turnos, {pregunta, respuesta, dibujos, archivos: r.archivos}],
+    turnos: [...estado.turnos, {pregunta, respuesta, dibujos, archivos, subidos}],
   });
   guardarTodo();
   // Lo que Claude arma para bajar a la hoja (nombre "hoja…") se inserta solo.
@@ -223,7 +284,8 @@ export async function insertar(i, j) {
   marcar(i, j, {estado: 'insertando', nota: null});
   try {
     const r = await insertarDibujo(dibujo.trazos, hoja);
-    marcar(i, j, {estado: 'insertado', nota: t(r.capa != null ? 'insertedLayer' : 'inserted', {trazos: r.trazos, rotulos: r.rotulos})});
+    const nota = t(r.capa != null ? 'insertedLayer' : 'inserted', {trazos: r.trazos, rotulos: r.rotulos});
+    marcar(i, j, {estado: 'insertado', nota: r.aviso ? `${nota} ${r.aviso}` : nota});
     if (r.seleccionado) {
       // quedó seleccionado: se cierra la ventana para poder arrastrarlo
       await PluginManager.closePluginView();
@@ -369,7 +431,7 @@ export async function reabrir() {
       await turno(yo, datos.pendiente.mensaje, datos.pendiente.pregunta);
     } catch (e) {
       if (yo === generacion) {
-        poner({ocupado: false, error: texto(e)});
+        poner({ocupado: false, fase: null, error: texto(e)});
       }
     }
   } else {

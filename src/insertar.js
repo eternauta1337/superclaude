@@ -54,44 +54,18 @@ export async function insertarDibujo(dibujo, ctx) {
   const propia = /\.note$/i.test(ctx.ruta) ? await capaPropia(ctx).catch(() => null) : null;
   const capa = propia ? propia.id : null;
 
-  const elementos = [];
-  try {
-    for (const t of dibujo.trazos) {
-      const res = await PluginCommAPI.createElement(0);
-      if (!res?.success) {
-        throw new Error(res?.error?.message || t('cannotCreateStroke'));
-      }
-      const el = res.result;
-      elementos.push(el);
-      const puntos = t.p.map(([x, y]) => lugar.punto(x, y));
-      // las líneas finas de la figura (grilla, ejes 3D) van más finas
-      // (y los contornos de las letras de una fórmula, que van con la fina)
-      el.thickness =
-        !t.glifo && t.g * lugar.escala >= 3 ? ancho : Math.max(100, Math.round(ancho / 2));
-      el.stroke.penColor = t.c;
-      el.stroke.penType = 10;
-      await el.stroke.points.setRange(0, puntos.length - 1, puntos);
-      await el.stroke.pressures.setRange(0, puntos.length - 1, puntos.map(() => PRESION));
-    }
-    for (let i = 0; i < elementos.length; i += POR_TANDA) {
-      const res = await PluginCommAPI.insertPageElements(
-        elementos.slice(i, i + POR_TANDA),
-        ctx.pagina,
-        capa,
-      );
-      if (!res?.success) {
-        throw new Error(res?.error?.message || t('cannotInsertStrokes'));
-      }
-    }
-  } finally {
-    for (const el of elementos) {
-      el.recycle?.();
-    }
-  }
+  // Los rótulos van como tinta (el contorno de sus letras) cuando el dibujo
+  // está en su capa (ahí la tablet no acepta cajas de texto, y así se mueven
+  // con el dibujo) o en un PDF (que no tiene cajas de texto). Si no, como cajas
+  // de texto editables, y como tinta los que no entren.
+  const enTinta = capa != null || !/\.note$/i.test(ctx.ruta);
+  const comoTinta = r => (r.glifos || []).map(p => ({p, g: r.g, c: r.c ?? 0, glifo: true}));
+  const deLetras = enTinta ? dibujo.textos.filter(r => r.glifos?.length) : [];
+  let trazos = await insertarTrazos([...dibujo.trazos, ...deLetras.flatMap(comoTinta)], {lugar, ancho, ctx, capa});
+  let rotulos = deLetras.length;
 
-  // Los rótulos, como cajas de texto (sólo en notas; en un PDF quedan afuera).
-  let rotulos = 0;
-  if (/\.note$/i.test(ctx.ruta)) {
+  if (!enTinta) {
+    const sobran = [];
     for (const t of dibujo.textos) {
       const [x0, y0] = lugar.puntoXY(t.x, t.base - t.alto + t.desc);
       const [x1, y1] = lugar.puntoXY(t.x + t.ancho, t.base + t.desc);
@@ -110,7 +84,13 @@ export async function insertarDibujo(dibujo, ctx) {
       });
       if (res?.success) {
         rotulos++;
+      } else if (t.glifos?.length) {
+        sobran.push(t);
       }
+    }
+    if (sobran.length) {
+      trazos += await insertarTrazos(sobran.flatMap(comoTinta), {lugar, ancho, ctx, capa});
+      rotulos += sobran.length;
     }
   }
   await PluginNoteAPI.saveCurrentNote?.();
@@ -124,27 +104,72 @@ export async function insertarDibujo(dibujo, ctx) {
     right: Math.min(hoja.width, Math.ceil(caja.right + 8)),
     bottom: Math.min(hoja.height, Math.ceil(caja.bottom + 8)),
   }).catch(() => null);
+  let aviso = null;
   if (propia && propia.anterior != null && propia.anterior !== propia.id) {
-    await activarCapa(ctx, propia.anterior).catch(() => null);
+    await activarCapa(ctx, propia.anterior).catch(e => {
+      aviso = t('couldNotReturnLayer', {error: e?.message || String(e)});
+    });
   }
-  return {trazos: elementos.length, rotulos, seleccionado: !!seleccionado?.success, capa};
+  return {trazos, rotulos, seleccionado: !!seleccionado?.success, capa, aviso};
 }
 
-// Deja activa la capa `id` de la página (y visible).
-async function activarCapa(ctx, id, capas = null) {
-  if (!capas) {
-    const res = await PluginFileAPI.getLayers(ctx.ruta, ctx.pagina);
-    if (!res?.success || !Array.isArray(res.result)) {
-      throw new Error(res?.error?.message || 'getLayers');
+// Crea los trazos (en píxeles de la figura) y los inserta en tandas en la
+// página y la capa. Devuelve cuántos.
+async function insertarTrazos(lista, {lugar, ancho, ctx, capa}) {
+  const elementos = [];
+  try {
+    for (const tr of lista) {
+      const res = await PluginCommAPI.createElement(0);
+      if (!res?.success) {
+        throw new Error(res?.error?.message || t('cannotCreateStroke'));
+      }
+      const el = res.result;
+      elementos.push(el);
+      const puntos = tr.p.map(([x, y]) => lugar.punto(x, y));
+      // las líneas finas de la figura (grilla, ejes 3D) van más finas, y los
+      // contornos de las letras (fórmulas y rótulos) con la fina
+      el.thickness =
+        !tr.glifo && tr.g * lugar.escala >= 3 ? ancho : Math.max(100, Math.round(ancho / 2));
+      el.stroke.penColor = tr.c;
+      el.stroke.penType = 10;
+      await el.stroke.points.setRange(0, puntos.length - 1, puntos);
+      await el.stroke.pressures.setRange(0, puntos.length - 1, puntos.map(() => PRESION));
     }
-    capas = res.result;
+    for (let i = 0; i < elementos.length; i += POR_TANDA) {
+      const res = await PluginCommAPI.insertPageElements(elementos.slice(i, i + POR_TANDA), ctx.pagina, capa);
+      if (!res?.success) {
+        throw new Error(res?.error?.message || t('cannotInsertStrokes'));
+      }
+    }
+  } finally {
+    for (const el of elementos) {
+      el.recycle?.();
+    }
   }
+  return elementos.length;
+}
+
+async function leerCapas(ctx) {
+  const res = await PluginFileAPI.getLayers(ctx.ruta, ctx.pagina);
+  if (!res?.success || !Array.isArray(res.result)) {
+    throw new Error(res?.error?.message || 'getLayers');
+  }
+  return res.result;
+}
+
+// Deja activa la capa `id` de la página (y visible). modifyLayers sólo acepta
+// capas 0 a 3 con nombre: el fondo u otra cosa que traiga getLayers hace
+// fallar el pedido entero, así que se dejan afuera. Después se relee para
+// saber si la tablet de verdad cambió.
+async function activarCapa(ctx, id, capas = null) {
+  capas = capas || (await leerCapas(ctx));
+  const validas = capas.filter(c => Number.isInteger(c.layerId) && c.layerId >= 0 && c.layerId <= 3);
   const res = await PluginFileAPI.modifyLayers(
     ctx.ruta,
     ctx.pagina,
-    capas.map(c => ({
+    validas.map(c => ({
       layerId: c.layerId,
-      name: c.name,
+      name: c.name || (c.layerId === 0 ? 'Main Layer' : `Layer ${c.layerId}`),
       isCurrentLayer: c.layerId === id,
       isVisible: c.layerId === id ? true : c.isVisible !== false,
     })),
@@ -153,6 +178,10 @@ async function activarCapa(ctx, id, capas = null) {
     throw new Error(res?.error?.message || 'modifyLayers');
   }
   await PluginCommAPI.reloadFile?.().catch(() => null);
+  const ahora = (await leerCapas(ctx)).find(c => c.isCurrentLayer)?.layerId;
+  if (ahora !== id) {
+    throw new Error(`layer ${ahora ?? '?'} still active`);
+  }
 }
 
 const CAPA = 'SuperClaude';
@@ -163,14 +192,7 @@ const CAPA = 'SuperClaude';
 // hay lugar.
 async function capaPropia(ctx) {
   await PluginNoteAPI.saveCurrentNote?.();
-  const leer = async () => {
-    const res = await PluginFileAPI.getLayers(ctx.ruta, ctx.pagina);
-    if (!res?.success || !Array.isArray(res.result)) {
-      throw new Error(res?.error?.message || 'getLayers');
-    }
-    return res.result;
-  };
-  let capas = await leer();
+  let capas = await leerCapas(ctx);
   const anterior = capas.find(c => c.isCurrentLayer)?.layerId ?? 0;
   let mia = capas.find(c => c.name === CAPA);
   if (!mia) {
@@ -187,7 +209,7 @@ async function capaPropia(ctx) {
     if (!res?.success || res.result === false) {
       return null;
     }
-    capas = await leer();
+    capas = await leerCapas(ctx);
     mia = capas.find(c => c.name === CAPA);
     if (!mia) {
       return null;

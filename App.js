@@ -156,7 +156,7 @@ export default function App() {
               {esperando ? <Text style={s.pregunta}>› {esperando}</Text> : null}
               {ocupado ? (
                 <Text style={s.nota}>
-                  {estado.recuperando ? t('recovering') : t('thinking')}
+                  {estado.recuperando ? t('recovering') : t(estado.fase || 'thinking')}
                 </Text>
               ) : null}
               {error ? <Text style={s.error}>{t('couldNot', {error})}</Text> : null}

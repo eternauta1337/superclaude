@@ -10,7 +10,12 @@ context (the exercise statement, earlier steps, the topic), while the window sho
 selection.
 
 - **Calculator and tutor**: equations, integrals, unit conversions, step by step.
-- **Charts and drawings**: ask for a graph (2D or 3D) or a line drawing of anything; it shows up in
+- **Charts and drawings**: ask for a graph (2D or 3D), an illustration or a diagram ("an animal cell
+  with its organelles", "a four-stroke engine in cross-section"), or ask it to trace a real image from
+  the web ("trace Leonardo's Vitruvian Man"). Claude picks how: matplotlib for charts, an SVG it
+  draws itself for illustrations, or a search on Wikimedia Commons and a trace of the image. On
+  **Best** it then looks at its own drawing and redraws it if it can do better; a detailed
+  illustration takes several minutes there. The drawing shows up in
   the window, and **Insert on page** puts it on your page as real ink strokes you can move and erase.
   In notes it goes to its own **SuperClaude** layer and is left selected, so you can drag it away
   from what's under it; you stay on the layer you were writing on.
@@ -40,7 +45,7 @@ any other server.
 | Setting | |
 | --- | --- |
 | Anthropic API key | Typed once; only its last characters are shown afterwards. |
-| Model | **Fast** (Claude Haiku 5.5), **Balanced** (Claude Sonnet 5.5) or **Best** (Claude Opus 5.5). Also switchable from the chat window. |
+| Model | **Fast** (Claude Haiku 5.5), **Balanced** (Claude Sonnet 5.5) or **Best** (Claude Opus 5.5, thinking harder and checking its drawings: slower and pricier). Also switchable from the chat window. |
 | Interface language | English or Español. |
 | Your instructions for Claude | Who you are, what you use it for, the language, tone and length you want. Sent with every question. |
 
@@ -62,9 +67,15 @@ The package ships with no API key, and nothing is sent anywhere except the Anthr
   the user's own instructions from Settings.
 - `src/matematica.js` typesets the LaTeX with plain React Native `Text`/`View` (KaTeX is used only
   as a parser): plugins have no WebView or SVG.
-- Drawings are made by Claude with matplotlib in Anthropic's code execution sandbox. Next to each
+- Drawings are made by Claude in Anthropic's code execution sandbox, always ending as a matplotlib
+  figure: charts directly; illustrations as hand-written SVG turned into a figure by
+  `src/svg_py.mjs` (a small SVG reader: the sandbox has no SVG library); traced images with
+  `src/calcar_py.mjs` (OpenCV and scikit-image: skeleton of the lines, or outlines for engravings
+  and photos). To trace, Claude searches the web and calls the `bajar_imagen` tool: the tablet
+  downloads the image and uploads it to the container, which has no internet. Next to each
   PNG it exports the figure as polylines and labels (`src/trazos_py.mjs`, a small matplotlib
-  renderer), and `src/insertar.js` inserts those as pen strokes and text boxes. Plugins cannot write
+  renderer), and `src/insertar.js` inserts those as pen strokes and text boxes. Requests are
+  streamed, since a large drawing takes minutes. Plugins cannot write
   files, so inserting the PNG itself is not possible. These files live in your Anthropic account's
   Files API storage; the ones from a conversation are deleted when a new lasso replaces it.
 - Plugins lose their memory when their window is hidden, and cannot write files. `src/memoria.mjs`

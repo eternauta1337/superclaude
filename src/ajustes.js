@@ -14,11 +14,12 @@ import {crearMemoria} from './memoria.mjs';
 import {SEMILLA_CLAVE} from './semilla';
 import {ponerIdioma} from './textos.mjs';
 
-// Tres niveles en vez de una lista de modelos.
+// Tres niveles en vez de una lista de modelos. Best piensa más y revisa sus
+// dibujos: una ilustración grande puede tardar 10 minutos.
 export const NIVELES = {
-  rapido: {modelo: 'claude-haiku-5-5', esfuerzo: 'low'},
-  normal: {modelo: 'claude-sonnet-5-5', esfuerzo: 'medium'},
-  maximo: {modelo: 'claude-opus-5-5', esfuerzo: 'medium'},
+  rapido: {modelo: 'claude-haiku-5-5', esfuerzo: 'low', maxTokens: 32000},
+  normal: {modelo: 'claude-sonnet-5-5', esfuerzo: 'medium', maxTokens: 32000},
+  maximo: {modelo: 'claude-opus-5-5', esfuerzo: 'high', maxTokens: 64000, revisa: true},
 };
 
 const POR_DEFECTO = {clave: '', prompt: '', nivel: 'maximo', idioma: 'en'};

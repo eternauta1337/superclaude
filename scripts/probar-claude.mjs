@@ -48,7 +48,7 @@ const r = await preguntar({clave, messages: mensajes, promptUsuario});
 await mostrar(r, t0);
 
 if (repregunta) {
-  mensajes = [...mensajes, r.mensaje, {role: 'user', content: repregunta}];
+  mensajes = [...mensajes, ...r.mensajes, {role: 'user', content: repregunta}];
   t0 = Date.now();
   console.log(`\n› ${repregunta}`);
   await mostrar(await preguntar({clave, messages: mensajes, contenedor: r.contenedor, promptUsuario}), t0);
