@@ -10,6 +10,17 @@ nombre="$(node -p "require('./package.json').name")"
 gen=build/generated
 out=build/outputs
 
+# src/semilla.js: vacía salvo que se arme con SUPERCLAUDE_SEMILLA_CLAVE, para
+# una copia personal que trae la clave para cargarla la primera vez. No va al
+# repo (.gitignore); lo que se comparte se arma sin la variable.
+node -e '
+  const fs = require("fs");
+  const clave = (process.env.SUPERCLAUDE_SEMILLA_CLAVE || "").trim();
+  fs.writeFileSync("src/semilla.js",
+    "// Generado por scripts/empaquetar.sh. No va al repo.\nexport const SEMILLA_CLAVE = " + JSON.stringify(clave) + ";\n",
+    {mode: 0o600});
+  console.error(clave ? "con clave semilla (copia personal)" : "sin clave");
+'
 
 rm -rf "$gen" && mkdir -p "$gen" "$out"
 npx react-native bundle --entry-file index.js --platform android --dev false \

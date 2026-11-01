@@ -1,2 +1,4 @@
 node_modules/
 build/
+# la genera scripts/empaquetar.sh (puede llevar una clave): nunca al repo
+src/semilla.js

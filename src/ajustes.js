@@ -11,6 +11,7 @@
 // Nada viene de fábrica: sin clave, la ventana pide ir a Ajustes.
 import {FileUtils, PluginManager} from 'sn-plugin-lib';
 import {crearMemoria} from './memoria.mjs';
+import {SEMILLA_CLAVE} from './semilla';
 import {ponerIdioma} from './textos.mjs';
 
 // Tres niveles en vez de una lista de modelos.
@@ -51,6 +52,14 @@ export async function cargarAjustes() {
       if (typeof guardados?.[k] === 'string') {
         actuales[k] = guardados[k];
       }
+    }
+    // Una copia personal puede venir con una clave "semilla" (ver
+    // scripts/empaquetar.sh): se usa sólo si en Ajustes no hay ninguna, y
+    // queda guardada ahí. La versión para compartir la trae vacía.
+    if (!actuales.clave && SEMILLA_CLAVE) {
+      actuales.clave = SEMILLA_CLAVE;
+      const {clave, prompt, nivel, idioma} = actuales;
+      (await elAlmacen()).guardar({clave, prompt, nivel, idioma});
     }
     ponerIdioma(actuales.idioma);
     avisar();
