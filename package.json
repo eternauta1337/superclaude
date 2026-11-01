@@ -1,6 +1,6 @@
 {
   "name": "superclaude",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "description": "Lasso anything on a Supernote and ask Claude: calculations, questions, charts, drawings.",
   "scripts": {

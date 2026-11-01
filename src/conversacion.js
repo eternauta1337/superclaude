@@ -135,6 +135,7 @@ async function turno(yo, mensaje, pregunta) {
     modelo: nivelActual().modelo,
     esfuerzo: nivelActual().esfuerzo,
     promptUsuario: config.prompt,
+    idioma: config.idioma,
   });
   if (yo !== generacion) {
     return;

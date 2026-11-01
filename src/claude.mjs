@@ -41,13 +41,21 @@ Every drawing is saved twice in $OUTPUT_DIR with the same name: the image, fig.s
 ${VALLA}python
 ${TRAZOS_PY}${VALLA}`;
 
-// El prompt completo: las reglas del plugin y, abajo, lo que el usuario
-// escribió en superclaude-prompt.txt.
-export function sistema(promptUsuario) {
+const IDIOMAS = {en: 'English', es: 'Spanish'};
+
+// El prompt completo: las reglas del plugin, el idioma elegido en Ajustes (si
+// no, una cuenta sin palabras salía en inglés aunque la interfaz estuviera en
+// español) y, abajo, las instrucciones propias del usuario, que mandan.
+export function sistema(promptUsuario, idioma) {
   const propio = String(promptUsuario || '').trim();
-  return propio
-    ? `${SISTEMA}\n\nThe user's own instructions (they take precedence on language, tone and length):\n${propio}`
-    : SISTEMA;
+  let s = SISTEMA;
+  if (IDIOMAS[idioma]) {
+    s += `\n\nThe user chose ${IDIOMAS[idioma]} as their language: answer in ${IDIOMAS[idioma]}, even when the selection has no words (a calculation, a drawing request), unless their own instructions below say otherwise.`;
+  }
+  if (propio) {
+    s += `\n\nThe user's own instructions (they take precedence on language, tone and length):\n${propio}`;
+  }
+  return s;
 }
 
 export const HERRAMIENTAS = [{type: 'code_execution_20260521', name: 'code_execution'}];
@@ -90,6 +98,7 @@ export async function preguntar({
   modelo = MODELO,
   esfuerzo = 'medium',
   promptUsuario = '',
+  idioma = null,
   timeoutMs = 120000,
 }) {
   let contenido = [];
@@ -116,7 +125,7 @@ export async function preguntar({
           ...(CON_FALLBACK.has(modelo) ? {fallbacks: 'default'} : {}),
           // el prompt (con el código de los trazos) es igual en cada pedido
           cache_control: {type: 'ephemeral'},
-          system: sistema(promptUsuario),
+          system: sistema(promptUsuario, idioma),
           tools: HERRAMIENTAS,
           ...(contenedor ? {container: contenedor} : {}),
           messages: historia,
