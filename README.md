@@ -3,7 +3,8 @@
 Lasso anything on your Supernote and ask Claude about it.
 
 Select handwriting, a sketch or a piece of a PDF with the lasso, tap **SuperClaude**, write what you
-want ("solve it", "what does this mean?", "draw it"), and Claude looks at it. The answer opens in a
+want ("solve it", "what does this mean?", "draw it"), and Claude looks at it. A fast model guesses
+your request and leaves it in the box; send it as is, edit it, or clear it with ✕. The answer opens in a
 window, with the math typeset, and you can keep asking follow-ups. Claude also gets the whole page as
 context (the exercise statement, earlier steps, the topic), while the window shows only your
 selection.
@@ -12,7 +13,7 @@ selection.
 - **Charts and drawings**: ask for a graph (2D or 3D) or a line drawing of anything; it shows up in
   the window, and **Insert on page** puts it on your page as real ink strokes you can move and erase.
   In notes it goes to its own **SuperClaude** layer and is left selected, so you can drag it away
-  from what's under it. That layer stays active afterwards: switch back to Main to keep writing there.
+  from what's under it; you stay on the layer you were writing on.
 - **Put it on the page**: ask "write the result on the page" and it lands below your selection, plain
   text as an editable text box and formulas as ink.
 - **Hide and come back**: hide the window to keep writing, and reopen the conversation from the

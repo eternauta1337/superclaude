@@ -47,10 +47,12 @@ export async function insertarDibujo(dibujo, ctx) {
   const lapicera = await PluginCommAPI.getPenInfo();
   const ancho = Math.max(100, lapicera?.success ? lapicera.result?.width || 200 : 200);
 
-  // En una nota, el dibujo va a su capa, que queda activa: el lazo es por
-  // área pero sólo toma la capa activa, así que agarra el dibujo y no lo que
-  // había abajo. Si no hay lugar para otra capa, va a la que esté activa.
-  const capa = /\.note$/i.test(ctx.ruta) ? await capaPropia(ctx).catch(() => null) : null;
+  // En una nota, el dibujo va a su capa, activa mientras se inserta: el lazo
+  // es por área pero sólo toma la capa activa, así que agarra el dibujo y no
+  // lo que había abajo. Después se vuelve a la capa en la que se estaba
+  // escribiendo. Si no hay lugar para otra capa, va a la que esté activa.
+  const propia = /\.note$/i.test(ctx.ruta) ? await capaPropia(ctx).catch(() => null) : null;
+  const capa = propia ? propia.id : null;
 
   const elementos = [];
   try {
@@ -122,14 +124,43 @@ export async function insertarDibujo(dibujo, ctx) {
     right: Math.min(hoja.width, Math.ceil(caja.right + 8)),
     bottom: Math.min(hoja.height, Math.ceil(caja.bottom + 8)),
   }).catch(() => null);
+  if (propia && propia.anterior != null && propia.anterior !== propia.id) {
+    await activarCapa(ctx, propia.anterior).catch(() => null);
+  }
   return {trazos: elementos.length, rotulos, seleccionado: !!seleccionado?.success, capa};
+}
+
+// Deja activa la capa `id` de la página (y visible).
+async function activarCapa(ctx, id, capas = null) {
+  if (!capas) {
+    const res = await PluginFileAPI.getLayers(ctx.ruta, ctx.pagina);
+    if (!res?.success || !Array.isArray(res.result)) {
+      throw new Error(res?.error?.message || 'getLayers');
+    }
+    capas = res.result;
+  }
+  const res = await PluginFileAPI.modifyLayers(
+    ctx.ruta,
+    ctx.pagina,
+    capas.map(c => ({
+      layerId: c.layerId,
+      name: c.name,
+      isCurrentLayer: c.layerId === id,
+      isVisible: c.layerId === id ? true : c.isVisible !== false,
+    })),
+  );
+  if (!res?.success || res.result === false) {
+    throw new Error(res?.error?.message || 'modifyLayers');
+  }
+  await PluginCommAPI.reloadFile?.().catch(() => null);
 }
 
 const CAPA = 'SuperClaude';
 
 // La capa "SuperClaude" de la página (la crea si falta, en el primer lugar
 // libre: una página tiene Main y hasta tres más) y la deja activa. Devuelve
-// su número, o null si no hay lugar.
+// {id, anterior}: su número y el de la capa que estaba activa, o null si no
+// hay lugar.
 async function capaPropia(ctx) {
   await PluginNoteAPI.saveCurrentNote?.();
   const leer = async () => {
@@ -140,6 +171,7 @@ async function capaPropia(ctx) {
     return res.result;
   };
   let capas = await leer();
+  const anterior = capas.find(c => c.isCurrentLayer)?.layerId ?? 0;
   let mia = capas.find(c => c.name === CAPA);
   if (!mia) {
     const libre = [1, 2, 3].find(id => !capas.some(c => c.layerId === id));
@@ -162,22 +194,11 @@ async function capaPropia(ctx) {
     }
   }
   if (!mia.isCurrentLayer || !mia.isVisible) {
-    const res = await PluginFileAPI.modifyLayers(
-      ctx.ruta,
-      ctx.pagina,
-      capas.map(c => ({
-        layerId: c.layerId,
-        name: c.name,
-        isCurrentLayer: c.layerId === mia.layerId,
-        isVisible: c.layerId === mia.layerId ? true : c.isVisible !== false,
-      })),
-    );
-    if (!res?.success || res.result === false) {
-      return null;
-    }
+    await activarCapa(ctx, mia.layerId, capas);
+  } else {
+    await PluginCommAPI.reloadFile?.().catch(() => null);
   }
-  await PluginCommAPI.reloadFile?.().catch(() => null);
-  return mia.layerId;
+  return {id: mia.layerId, anterior};
 }
 
 // Recorta la figura a lo que tiene dibujado y la acomoda debajo de la

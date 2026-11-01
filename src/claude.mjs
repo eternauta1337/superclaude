@@ -103,6 +103,43 @@ export function conPagina(mensaje, base64, lugar) {
   return {...mensaje, content};
 }
 
+// Adivina con el modelo barato qué va a pedir el usuario sobre la selección,
+// para dejarlo escrito en la caja. `mensaje` es el primero, ya con un texto en
+// el lugar de la pregunta. Devuelve el pedido, o '' si no se le ocurre nada.
+export const MODELO_SUGERENCIA = 'claude-haiku-5-5';
+
+export async function sugerir({clave, mensaje, idioma = null, promptUsuario = '', timeoutMs = 20000}) {
+  const lengua = IDIOMAS[idioma] || 'the language of the selection';
+  const sobre = promptUsuario.trim() ? `\n\nAbout the user:\n${promptUsuario.trim()}` : '';
+  const res = await conTimeout(timeoutMs, signal =>
+    fetch(`${URL_API}/messages`, {
+      method: 'POST',
+      signal,
+      headers: {'content-type': 'application/json', 'x-api-key': clave, 'anthropic-version': '2023-06-01'},
+      body: JSON.stringify({
+        model: MODELO_SUGERENCIA,
+        max_tokens: 80,
+        // sin pensar: es una línea, y pensando se come los tokens y no contesta
+        thinking: {type: 'disabled'},
+        system:
+          'The user selected something on a Supernote e-ink tablet and is about to ask an AI assistant about it. ' +
+          'Guess the request they are most likely to type, from the selection and the page. Reply with only that ' +
+          `request, as they would write it: an instruction or a short question, at most 12 words, in ${lengua}, ` +
+          'no quotes, no math markup.' +
+          sobre,
+        messages: [mensaje],
+      }),
+    }),
+  );
+  const cuerpo = await leerJson(res);
+  return (cuerpo.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join(' ')
+    .replace(/^["'“”«»\s]+|["'“”«»\s]+$/g, '')
+    .slice(0, 200);
+}
+
 // Manda la conversación y devuelve {texto, archivos, mensaje, contenedor, uso}.
 // `mensaje` es el turno del asistente tal cual, para agregarlo a la
 // conversación; `archivos`, los file_id de lo que dibujó; `contenedor`, el del

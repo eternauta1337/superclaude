@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import {PluginManager} from 'sn-plugin-lib';
 import {cargarAjustes, escucharAjustes, guardarAjustes} from './src/ajustes';
-import {escuchar, insertar, reabrir, repreguntar} from './src/conversacion';
+import {descartarSugerencia, escuchar, insertar, reabrir, repreguntar} from './src/conversacion';
 import {TextoConMate} from './src/matematica';
 import {Niveles, PantallaAjustes} from './src/PantallaAjustes';
 import {t} from './src/textos.mjs';
@@ -49,6 +49,19 @@ export default function App() {
     return () => dejar.forEach(f => f());
   }, []);
 
+  // Lo que el modelo barato adivina que se va a pedir queda escrito en la caja,
+  // salvo que ya se haya empezado a escribir. La ✕ lo borra entero.
+  const sugerencia = estado?.sugerencia;
+  const vuelta = estado?.vuelta;
+  useEffect(() => {
+    setPregunta(''); // una selección nueva arranca con la caja vacía
+  }, [vuelta]);
+  useEffect(() => {
+    if (sugerencia) {
+      setPregunta(p => (p ? p : sugerencia));
+    }
+  }, [sugerencia]);
+
   if (!estado || !ajustes) {
     return null;
   }
@@ -61,6 +74,11 @@ export default function App() {
     repreguntar(pregunta);
     setPregunta('');
     Keyboard.dismiss();
+  };
+
+  const borrar = () => {
+    setPregunta('');
+    descartarSugerencia();
   };
 
   const conTeclado = escribiendo || teclado > 0;
@@ -164,6 +182,11 @@ export default function App() {
                   blurOnSubmit
                   returnKeyType="send"
                 />
+                {pregunta && !ocupado ? (
+                  <Pressable onPress={borrar} style={[s.boton, s.cruz]} hitSlop={12}>
+                    <Text style={s.botonTexto}>✕</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable onPress={mandar} disabled={ocupado} style={s.boton}>
                   <Text style={s.botonTexto}>{t('send')}</Text>
                 </Pressable>
@@ -242,4 +265,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
   },
   botonTexto: {fontSize: 24, fontWeight: '700', color: '#000'},
+  cruz: {marginRight: 12, paddingHorizontal: 12},
 });

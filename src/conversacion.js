@@ -12,6 +12,7 @@ import {
   mensajeConTexto,
   preguntar,
   subirImagen,
+  sugerir,
 } from './claude.mjs';
 import {aBase64, imagenDeLaPagina, imagenDelLazo, pedirPermisos, textoSeleccionado, uri} from './captura';
 import {contexto, insertarDibujo} from './insertar';
@@ -43,6 +44,7 @@ const vacio = {
   turnos: [], // {pregunta, respuesta, dibujos: [{nombre, uri, trazos, estado, nota}]}
   listo: false, // la selección está tomada y espera que se escriba qué hacer
   esperando: null, // la pregunta que Claude está contestando, para mostrarla
+  sugerencia: null, // lo que el modelo barato cree que se va a pedir
   error: null,
 };
 
@@ -95,7 +97,7 @@ export async function empezar(origen) {
   datosPagina = null;
   borrador = null;
   estado = vacio;
-  poner({ocupado: true});
+  poner({ocupado: true, vuelta: yo});
   try {
     await pedirPermisos();
     config = await cargarAjustes();
@@ -135,6 +137,7 @@ export async function empezar(origen) {
     borrador = primero;
     poner({ocupado: false, listo: true});
     guardarTodo();
+    adivinar(yo, primero);
   } catch (e) {
     if (yo === generacion) {
       poner({ocupado: false, error: texto(e)});
@@ -198,6 +201,7 @@ async function turno(yo, mensaje, pregunta) {
     ocupado: false,
     esperando: null,
     listo: false,
+    sugerencia: null,
     turnos: [...estado.turnos, {pregunta, respuesta, dibujos, archivos: r.archivos}],
   });
   guardarTodo();
@@ -269,6 +273,7 @@ function guardarTodo() {
       imagen,
       seleccion,
       listo: estado.listo,
+      sugerencia: estado.sugerencia,
       turnos: turnos.map(t => ({
         ...t,
         dibujos: (t.dibujos || []).map(({nombre, estado: e, nota}) => ({nombre, estado: e, nota})),
@@ -382,6 +387,32 @@ async function mensajeImagen(ruta) {
       archivo: {uri: uri(ruta), name: 'lazo.png', type: 'image/png'},
     });
     return mensajeConArchivo(id, PREGUNTA);
+  }
+}
+
+// La sugerencia para la caja, sólo para la primera pregunta. Si falla o
+// tarda, no pasa nada: la caja queda vacía.
+function adivinar(yo, primero) {
+  sugerir({
+    clave: config.clave,
+    mensaje: conPregunta(primero, '(not written yet)'),
+    idioma: config.idioma,
+    promptUsuario: config.prompt,
+  })
+    .then(texto => {
+      if (yo === generacion && borrador && texto) {
+        poner({sugerencia: texto});
+        guardarTodo();
+      }
+    })
+    .catch(e => console.warn('[superclaude] sin sugerencia', e));
+}
+
+// La ✕ de la caja: la sugerencia no vuelve, ni al reabrir.
+export function descartarSugerencia() {
+  if (estado.sugerencia) {
+    poner({sugerencia: null});
+    guardarTodo();
   }
 }
 
