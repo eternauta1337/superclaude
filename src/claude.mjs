@@ -554,7 +554,7 @@ async function subirArchivo({clave, nombre, tipo, bytes, timeoutMs = 90000}) {
 }
 
 async function bajarBinario(url, timeoutMs) {
-  const headers = {'User-Agent': 'SuperClaude (Supernote plugin; +https://github.com/eternauta1337/superclaude)'};
+  const headers = {'User-Agent': 'SuperClaude (Supernote plugin)'};
   if (typeof XMLHttpRequest !== 'undefined') {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
