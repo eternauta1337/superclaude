@@ -167,18 +167,28 @@ export async function repreguntar(pregunta) {
 async function turno(yo, mensaje, pregunta) {
   poner({esperando: pregunta});
   config = await cargarAjustes(); // por si cambiaron la clave o el nivel en Ajustes
-  // La primera pregunta lleva los módulos de dibujo, que quedan en el
-  // contenedor para toda la conversación. Si no suben, se pregunta igual:
+  // Los módulos de dibujo se suben con la primera pregunta y van con cada
+  // pregunta, no sólo con la primera: si un turno no corre código la API no
+  // guarda el contenedor, y si vence arma otro; en los dos casos el contenedor
+  // nuevo nace sin los módulos (02/11: "no están en mi entorno", y el dibujo
+  // salía sin trazos ni botón de insertar). Si no suben, se pregunta igual:
   // sólo los dibujos van a fallar.
   const lista = c => (typeof c === 'string' ? [{type: 'text', text: c}] : c);
+  const modulos = mensajes.length ? lista(mensajes[0].content).filter(b => b.type === 'container_upload') : [];
   let sinModulos = null;
-  if (mensajes.length === 0 && !lista(mensaje.content).some(b => b.type === 'container_upload')) {
-    try {
-      const m = await subirModulos({clave: config.clave});
-      mensaje = {...mensaje, content: [...m.bloques, ...lista(mensaje.content)]};
-    } catch (e) {
-      console.warn('[superclaude] no subieron los módulos de dibujo', e);
-      sinModulos = texto(e);
+  const nuevosModulos = [];
+  if (!lista(mensaje.content).some(b => b.type === 'container_upload')) {
+    if (modulos.length) {
+      mensaje = {...mensaje, content: [...modulos, ...lista(mensaje.content)]};
+    } else {
+      try {
+        const m = await subirModulos({clave: config.clave});
+        nuevosModulos.push(...m.ids);
+        mensaje = {...mensaje, content: [...m.bloques, ...lista(mensaje.content)]};
+      } catch (e) {
+        console.warn('[superclaude] no subieron los módulos de dibujo', e);
+        sinModulos = texto(e);
+      }
     }
   }
   // Se guarda antes de preguntar: si se oculta la ventana mientras Claude
@@ -205,9 +215,12 @@ async function turno(yo, mensaje, pregunta) {
   }
   pendiente = null;
   borrador = null;
-  // los módulos van en el primer mensaje (también si se reenvió al reabrir)
+  // los módulos se suben con el primer mensaje (también si se reenvió al
+  // reabrir), o más tarde si en el primero fallaron
   const delPrimero =
-    mensajes.length === 0 ? lista(mensaje.content).filter(b => b.type === 'container_upload').map(b => b.file_id) : [];
+    mensajes.length === 0
+      ? lista(mensaje.content).filter(b => b.type === 'container_upload').map(b => b.file_id)
+      : nuevosModulos;
   mensajes = [...mensajes, mensaje, ...r.mensajes];
   contenedor = r.contenedor;
   let respuesta = r.texto;

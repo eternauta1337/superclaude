@@ -54,7 +54,7 @@ ${VALLA}
 svg_a_figura understands path (all commands, arcs included), rect, circle, ellipse, line, polyline, polygon, g, use, transform, stroke, fill (drawn as an outline), stroke-width, stroke-dasharray, and text with font-size, font-weight and text-anchor; not CSS classes, gradients, markers or clip paths.`;
 
 // Los módulos de Python que Claude usa para dibujar: el plugin los sube con la
-// primera pregunta de cada conversación (quedan en $INPUT_DIR del contenedor).
+// primera pregunta y van con cada una (quedan en $INPUT_DIR del contenedor).
 // Antes iban en el prompt y Claude los reescribía en cada dibujo: ~7.000
 // tokens, casi un minuto.
 const MODULOS = [
