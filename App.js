@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import {PluginManager} from 'sn-plugin-lib';
 import {cargarAjustes, escucharAjustes, guardarAjustes} from './src/ajustes';
-import {descartarSugerencia, escuchar, insertar, reabrir, repreguntar} from './src/conversacion';
+import {descartarSugerencia, enNota, escuchar, insertar, reabrir, repreguntar} from './src/conversacion';
 import {TextoConMate} from './src/matematica';
 import {Niveles, PantallaAjustes} from './src/PantallaAjustes';
 import {t} from './src/textos.mjs';
@@ -130,17 +130,21 @@ export default function App() {
                   {(tu.dibujos || []).map((d, j) => (
                     <View key={j} style={s.dibujoCaja}>
                       <Image source={{uri: d.uri}} style={s.dibujo} resizeMode="contain" />
-                      {d.trazos ? (
-                        <Pressable
-                          onPress={() => insertar(i, j)}
-                          disabled={d.estado === 'insertando'}
-                          style={[s.boton, s.insertar]}>
+                      {d.trazos && d.estado === 'insertando' ? (
+                        <Text style={[s.nota, s.insertar]}>{t('inserting')}</Text>
+                      ) : d.trazos && enNota() ? (
+                        <View style={s.insertarFila}>
+                          <Pressable onPress={() => insertar(i, j)} style={s.boton}>
+                            <Text style={s.botonTexto}>{t('insertHere')}</Text>
+                          </Pressable>
+                          <Pressable onPress={() => insertar(i, j, {nueva: true})} style={s.boton}>
+                            <Text style={s.botonTexto}>{t('insertNewLayer')}</Text>
+                          </Pressable>
+                        </View>
+                      ) : d.trazos ? (
+                        <Pressable onPress={() => insertar(i, j)} style={[s.boton, s.insertar]}>
                           <Text style={s.botonTexto}>
-                            {d.estado === 'insertando'
-                              ? t('inserting')
-                              : d.estado === 'insertado'
-                              ? t('insertAgain')
-                              : t('insert')}
+                            {d.estado === 'insertado' ? t('insertAgain') : t('insert')}
                           </Text>
                         </Pressable>
                       ) : null}
@@ -235,6 +239,7 @@ const s = StyleSheet.create({
   dibujoCaja: {marginTop: 12, alignItems: 'center'},
   dibujo: {width: '100%', aspectRatio: 1.5},
   insertar: {marginTop: 8, alignSelf: 'center'},
+  insertarFila: {marginTop: 8, flexDirection: 'row', justifyContent: 'center', gap: 16},
   nota: {fontSize: 26, color: '#000'},
   error: {fontSize: 26, color: '#000', fontWeight: '700'},
   pie: {

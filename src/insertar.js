@@ -32,7 +32,10 @@ export async function contexto() {
   };
 }
 
-export async function insertarDibujo(dibujo, ctx) {
+// `nueva`: en una nota, el dibujo va a una capa nueva (y queda activa); si
+// no, a la capa en la que se está escribiendo. Al salir, la tablet queda en la
+// capa donde se insertó: no se vuelve a ninguna otra (Ale, 02/11).
+export async function insertarDibujo(dibujo, ctx, {nueva = false} = {}) {
   if (!ctx) {
     throw new Error(t('noPage'));
   }
@@ -47,12 +50,9 @@ export async function insertarDibujo(dibujo, ctx) {
   const lapicera = await PluginCommAPI.getPenInfo();
   const ancho = Math.max(100, lapicera?.success ? lapicera.result?.width || 200 : 200);
 
-  // En una nota, el dibujo va a su capa, activa mientras se inserta: el lazo
-  // es por área pero sólo toma la capa activa, así que agarra el dibujo y no
-  // lo que había abajo. Después se vuelve a la capa en la que se estaba
-  // escribiendo. Si no hay lugar para otra capa, va a la que esté activa.
-  const propia = /\.note$/i.test(ctx.ruta) ? await capaPropia(ctx).catch(() => null) : null;
-  const capa = propia ? propia.id : null;
+  // null: la capa activa. Una capa nueva queda activa, así el lazo (que sólo
+  // toma la capa activa) agarra el dibujo y no lo que había abajo.
+  const capa = nueva && /\.note$/i.test(ctx.ruta) ? await capaNueva(ctx) : null;
 
   // Los rótulos van como tinta (el contorno de sus letras) cuando el dibujo
   // está en su capa (ahí la tablet no acepta cajas de texto, y así se mueven
@@ -95,8 +95,8 @@ export async function insertarDibujo(dibujo, ctx) {
   }
   await PluginNoteAPI.saveCurrentNote?.();
 
-  // Queda seleccionado, para moverlo si pisa algo. Sin capa propia, lo que
-  // había abajo también entra.
+  // Queda seleccionado, para moverlo si pisa algo. En la capa en la que se
+  // escribía, lo que había abajo también entra.
   const caja = lugar.caja();
   const seleccionado = await PluginCommAPI.lassoElements({
     left: Math.max(0, Math.floor(caja.left - 8)),
@@ -104,13 +104,7 @@ export async function insertarDibujo(dibujo, ctx) {
     right: Math.min(hoja.width, Math.ceil(caja.right + 8)),
     bottom: Math.min(hoja.height, Math.ceil(caja.bottom + 8)),
   }).catch(() => null);
-  let aviso = null;
-  if (propia && propia.anterior != null && propia.anterior !== propia.id) {
-    await activarCapa(ctx, propia.anterior).catch(e => {
-      aviso = t('couldNotReturnLayer', {error: e?.message || String(e)});
-    });
-  }
-  return {trazos, rotulos, seleccionado: !!seleccionado?.success, capa, aviso};
+  return {trazos, rotulos, seleccionado: !!seleccionado?.success, capa};
 }
 
 // Crea los trazos (en píxeles de la figura) y los inserta en tandas en la
@@ -186,41 +180,40 @@ async function activarCapa(ctx, id, capas = null) {
 
 const CAPA = 'SuperClaude';
 
-// La capa "SuperClaude" de la página (la crea si falta, en el primer lugar
-// libre: una página tiene Main y hasta tres más) y la deja activa. Devuelve
-// {id, anterior}: su número y el de la capa que estaba activa, o null si no
-// hay lugar.
-async function capaPropia(ctx) {
+// Crea una capa nueva en la página, en el primer lugar libre (una página
+// tiene Main y hasta tres más), y la deja activa. Devuelve su número.
+async function capaNueva(ctx) {
   await PluginNoteAPI.saveCurrentNote?.();
-  let capas = await leerCapas(ctx);
-  const anterior = capas.find(c => c.isCurrentLayer)?.layerId ?? 0;
-  let mia = capas.find(c => c.name === CAPA);
+  const capas = await leerCapas(ctx);
+  const libre = [1, 2, 3].find(id => !capas.some(c => c.layerId === id));
+  if (libre == null) {
+    throw new Error(t('noFreeLayer'));
+  }
+  const usados = new Set(capas.map(c => c.name));
+  let nombre = CAPA;
+  for (let n = 2; usados.has(nombre); n++) {
+    nombre = `${CAPA} ${n}`;
+  }
+  const res = await PluginFileAPI.insertLayer(ctx.ruta, ctx.pagina, {
+    layerId: libre,
+    name: nombre,
+    isCurrentLayer: true,
+    isVisible: true,
+  });
+  if (!res?.success || res.result === false) {
+    throw new Error(res?.error?.message || 'insertLayer');
+  }
+  const ahora = await leerCapas(ctx);
+  const mia = ahora.find(c => c.layerId === libre);
   if (!mia) {
-    const libre = [1, 2, 3].find(id => !capas.some(c => c.layerId === id));
-    if (libre == null) {
-      return null;
-    }
-    const res = await PluginFileAPI.insertLayer(ctx.ruta, ctx.pagina, {
-      layerId: libre,
-      name: CAPA,
-      isCurrentLayer: true,
-      isVisible: true,
-    });
-    if (!res?.success || res.result === false) {
-      return null;
-    }
-    capas = await leerCapas(ctx);
-    mia = capas.find(c => c.name === CAPA);
-    if (!mia) {
-      return null;
-    }
+    throw new Error('insertLayer');
   }
   if (!mia.isCurrentLayer || !mia.isVisible) {
-    await activarCapa(ctx, mia.layerId, capas);
+    await activarCapa(ctx, libre, ahora);
   } else {
     await PluginCommAPI.reloadFile?.().catch(() => null);
   }
-  return {id: mia.layerId, anterior};
+  return libre;
 }
 
 // Recorta la figura a lo que tiene dibujado y la acomoda debajo de la

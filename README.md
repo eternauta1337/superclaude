@@ -16,9 +16,9 @@ selection.
   draws itself for illustrations, or a search on Wikimedia Commons and a trace of the image. On
   **Best** it then looks at its own drawing and redraws it if it can do better; a detailed
   illustration takes several minutes there. The drawing shows up in
-  the window, and **Insert on page** puts it on your page as real ink strokes you can move and erase.
-  In notes it goes to its own **SuperClaude** layer and is left selected, so you can drag it away
-  from what's under it; you stay on the layer you were writing on.
+  the window, and inserting puts it on your page as real ink strokes you can move and erase. In
+  notes you choose **In this layer** or **In a new layer** (a fresh layer, handy to drag the drawing
+  away from what's under it); it is left selected, and you stay on the layer where it went.
 - **Put it on the page**: ask "write the result on the page" and it lands below your selection, plain
   text as an editable text box and formulas as ink.
 - **Hide and come back**: hide the window to keep writing, and reopen the conversation from the

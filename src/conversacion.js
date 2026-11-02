@@ -288,17 +288,24 @@ async function turno(yo, mensaje, pregunta) {
   }
 }
 
-// Pone en la hoja el dibujo j del turno i, como tinta, debajo de la selección.
-export async function insertar(i, j) {
+// Si se está en una nota (las capas sólo existen ahí): la ventana ofrece
+// insertar en esta capa o en una nueva.
+export function enNota() {
+  return /\.note$/i.test(hoja?.ruta || '');
+}
+
+// Pone en la hoja el dibujo j del turno i, como tinta, debajo de la selección:
+// en la capa en la que se escribe, o con `nueva` en una capa nueva.
+export async function insertar(i, j, {nueva = false} = {}) {
   const dibujo = estado.turnos[i]?.dibujos[j];
   if (!dibujo?.trazos || dibujo.estado === 'insertando') {
     return false;
   }
   marcar(i, j, {estado: 'insertando', nota: null});
   try {
-    const r = await insertarDibujo(dibujo.trazos, hoja);
+    const r = await insertarDibujo(dibujo.trazos, hoja, {nueva});
     const nota = t(r.capa != null ? 'insertedLayer' : 'inserted', {trazos: r.trazos, rotulos: r.rotulos});
-    marcar(i, j, {estado: 'insertado', nota: r.aviso ? `${nota} ${r.aviso}` : nota});
+    marcar(i, j, {estado: 'insertado', nota});
     if (r.seleccionado) {
       // quedó seleccionado: se cierra la ventana para poder arrastrarlo
       await PluginManager.closePluginView();
