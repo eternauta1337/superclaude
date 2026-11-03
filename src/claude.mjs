@@ -165,9 +165,11 @@ export async function sugerir({clave, mensaje, idioma = null, promptUsuario = ''
         thinking: {type: 'disabled'},
         system:
           'The user selected something on a Supernote e-ink tablet and is about to ask an AI assistant about it. ' +
-          'Guess the request they are most likely to type, from the selection and the page. Reply with only that ' +
-          `request, as they would write it: an instruction or a short question, at most 12 words, in ${lengua}, ` +
-          'no quotes, no math markup.' +
+          'Guess the request they are most likely to type about the selection (the first image). The whole page, ' +
+          'if it comes, is only context to understand the selection: never suggest something about the rest of the ' +
+          'page. If the selection is a calculation, an expression or an equation, the request is to compute or solve ' +
+          'it, not to explain it. Reply with only that request, written by the user to the assistant: an ' +
+          `instruction or a short question, at most 12 words, in ${lengua}, no quotes, no math markup.` +
           sobre,
         messages: [mensaje],
       }),
